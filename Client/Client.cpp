@@ -17,32 +17,35 @@ void Client::run() {
 
 void Client::sendMessages() {
     while(true) {
-        int socket_file_descriptor = socket(AF_INET,SOCK_STREAM,0);
+        int socket_file_descriptor = socket(AF_INET, SOCK_STREAM, 0);
         if(socket_file_descriptor < 0) {
-            std::cerr << "Error opening socket!" << std::endl;
-            return;
+            throw std::runtime_error("Error opening socket!");
         }
 
         sockaddr_in serv_addr;
         serv_addr.sin_family = AF_INET;
         serv_addr.sin_port = htons(_port);
-        inet_pton(AF_INET, _serverIp.c_str() , &serv_addr.sin_addr);
-
-        if(connect(socket_file_descriptor,(sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
-            std::cerr << "Error connecting to server" << std::endl;
+        if (inet_pton(AF_INET, _serverIp.c_str(), &serv_addr.sin_addr) <= 0) {
             close(socket_file_descriptor);
-            return;
+            throw std::runtime_error("Invalid server IP address.");
         }
 
+        if(connect(socket_file_descriptor, (sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
+            close(socket_file_descriptor);
+            throw std::runtime_error("Error connecting to server");
+        }
 
-        std::lock_guard<std::mutex> guard(_mutex);
-        std::string message = formatCurrentTime() + " " + _name;
-
-        write(socket_file_descriptor, message.c_str(), message.length());
+        {
+            std::lock_guard<std::mutex> guard(_mutex);
+            std::string message = formatCurrentTime() + " " + _name;
+            if (write(socket_file_descriptor, message.c_str(), message.length()) < 0) {
+                close(socket_file_descriptor);
+                throw std::runtime_error("Error writing to socket");
+            }
+        }
         close(socket_file_descriptor);
 
         std::this_thread::sleep_for(std::chrono::seconds(_period));
-
     }
 }
 
@@ -57,4 +60,3 @@ std::string Client::formatCurrentTime() {
     std::strftime(timestamp, sizeof(timestamp), "[%Y-%m-%d %H:%M:%S", &now_tm);
     return std::string(timestamp) + "." + std::to_string(now_ms.count()) + "]";
 }
-
