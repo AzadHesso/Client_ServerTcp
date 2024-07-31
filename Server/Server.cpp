@@ -5,14 +5,15 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <stdexcept>
+#include <mutex>
 
 Server::Server(int port) : _port(port), _serverSocket(0) {}
 
 void Server::run() {
     _serverSocket = socket(AF_INET, SOCK_STREAM, 0);   
     if(_serverSocket < 0) {
-        std::cerr << "Error opening socket" << std::endl;
-        return;
+        throw std::runtime_error("Error opening socket");
     }
 
     sockaddr_in server_addr;
@@ -21,20 +22,18 @@ void Server::run() {
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
     if(bind(_serverSocket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        std::cerr << "Error binding socket" << std::endl;
         close(_serverSocket);
-        return;
+        throw std::runtime_error("Error binding socket");
     }
 
     if(listen(_serverSocket, 5) < 0) {
-        std::cerr << "Error listening on socket" << std::endl;
         close(_serverSocket);
-        return;
+        throw std::runtime_error("Error listening on socket");
     }
 
     std::cout << "Server is running on port " << _port << std::endl;
 
-    while(true){
+    while(true) {
         int clientSocket = accept(_serverSocket, NULL, NULL);
         if (clientSocket < 0) {
             std::cerr << "Error accepting connection" << std::endl;
@@ -46,12 +45,24 @@ void Server::run() {
 }
 
 void Server::handleClient(int clientSocket) {
-    char buffer[1024] = {0};
-    int bytesRead = read(clientSocket, buffer, sizeof(buffer));
-    if(bytesRead > 0) {
-        std::lock_guard<std::mutex> guard(logMutex); 
-        std::ofstream logFile("log.txt", std::ios::app);
-        logFile << buffer << std::endl;
+    try {
+        char buffer[1024] = {0};
+        int bytesRead = read(clientSocket, buffer, sizeof(buffer));
+        if (bytesRead < 0) {
+            close(clientSocket);
+            throw std::runtime_error("Error reading from socket");
+        }
+
+        if (bytesRead > 0) {
+            std::lock_guard<std::mutex> guard(logMutex); 
+            std::ofstream logFile("log.txt", std::ios::app);
+            if (!logFile.is_open()) {
+                throw std::runtime_error("Error opening log file");
+            }
+            logFile << buffer << std::endl;
+        }
+    } catch (const std::exception &e) {
+        std::cerr << "Exception in handleClient: " << e.what() << std::endl;
     }
     close(clientSocket);
 }
