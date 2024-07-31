@@ -49,6 +49,7 @@ void Server::handleClient(int clientSocket) {
     char buffer[1024] = {0};
     int bytesRead = read(clientSocket, buffer, sizeof(buffer));
     if(bytesRead > 0) {
+        std::lock_guard<std::mutex> guard(logMutex); 
         std::ofstream logFile("log.txt", std::ios::app);
         logFile << buffer << std::endl;
     }
