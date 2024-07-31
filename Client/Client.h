@@ -2,6 +2,7 @@
 #define CLIENT_H
 
 #include <string>
+#include <mutex>
 
 
 class Client {
@@ -18,6 +19,8 @@ private:
     std::string _serverIp;
     int _port;
     int _period;
+
+    std::mutex _mutex;
 };
 
 #endif 

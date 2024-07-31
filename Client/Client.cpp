@@ -34,6 +34,8 @@ void Client::sendMessages() {
             return;
         }
 
+
+        std::lock_guard<std::mutex> guard(_mutex);
         std::string message = formatCurrentTime() + " " + _name;
 
         write(socket_file_descriptor, message.c_str(), message.length());
